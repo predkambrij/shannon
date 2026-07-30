@@ -73,6 +73,17 @@ export function resolveEffectiveProvider(): EffectiveProvider {
   return eff;
 }
 
+/**
+ * Find a built-in Anthropic model to use as a template for a custom-base-URL
+ * model that isn't in the registry. Prefers the large-tier default, then falls
+ * back to any Anthropic model.
+ */
+export function findAnthropicTemplate(registry: ModelRegistry): Model<Api> | undefined {
+  const preferred = registry.find('anthropic', DEFAULT_MODELS.large);
+  if (preferred) return preferred;
+  return registry.getAll().find((entry) => entry.provider === 'anthropic');
+}
+
 /** Resolve a model tier to a concrete model ID (env override → default). */
 export function resolveModelId(tier: ModelTier = 'medium'): string {
   switch (tier) {
@@ -134,7 +145,18 @@ export function resolveModelSelection(
   }
 
   const registry = registryFactory(authStorage);
-  const found = registry.find(eff.providerId, modelId);
+  let found = registry.find(eff.providerId, modelId);
+
+  // Custom base URL with a model the registry doesn't know (e.g. a z.ai GLM id):
+  // clone a built-in Anthropic model so pi keeps the Anthropic request format the
+  // endpoint expects, then rewrite its identity to the requested model id.
+  if (!found && eff.baseUrl) {
+    const template = findAnthropicTemplate(registry);
+    if (template) {
+      found = { ...template, id: modelId, name: modelId };
+    }
+  }
+
   if (!found) {
     throw new Error(`Model not found in pi registry: provider="${eff.providerId}" model="${modelId}"`);
   }

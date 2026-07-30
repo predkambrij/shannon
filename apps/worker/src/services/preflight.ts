@@ -34,7 +34,7 @@ import {
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
 import { glob } from 'zx';
-import { resolveEffectiveProvider, resolveModelId } from '../ai/models.js';
+import { findAnthropicTemplate, resolveEffectiveProvider, resolveModelId } from '../ai/models.js';
 import { parseConfig } from '../config-parser.js';
 import type { ActivityLogger } from '../types/activity-logger.js';
 import type { Config, Rule } from '../types/config.js';
@@ -280,11 +280,24 @@ async function probeCredentialsWithPi(
   const authStorage = AuthStorage.inMemory();
   if (token) authStorage.setRuntimeApiKey('anthropic', token);
 
-  const baseModel = ModelRegistry.create(authStorage).find('anthropic', resolveModelId('small'));
+  const registry = ModelRegistry.create(authStorage);
+  const smallModelId = resolveModelId('small');
+  let baseModel = registry.find('anthropic', smallModelId);
+
+  // Custom base URL with a model the registry doesn't know (e.g. a z.ai GLM id):
+  // clone a built-in Anthropic model so the probe keeps the Anthropic request
+  // format the endpoint expects, then rewrite its identity to the requested id.
+  if (!baseModel && baseUrl) {
+    const template = findAnthropicTemplate(registry);
+    if (template) {
+      baseModel = { ...template, id: smallModelId, name: smallModelId };
+    }
+  }
+
   if (!baseModel) {
     return err(
       new PentestError(
-        `Model not found in pi registry: ${resolveModelId('small')}`,
+        `Model not found in pi registry: ${smallModelId}`,
         'config',
         false,
         {},

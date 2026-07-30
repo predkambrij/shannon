@@ -1,5 +1,8 @@
 node_modules/
 .env
+.env-ctrlsh
+ctrl.local.sh
+README-ctrlsh.local.md
 workspaces/
 credentials/
 dist/

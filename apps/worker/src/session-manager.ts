@@ -102,6 +102,9 @@ export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> = Object.freez
     prerequisites: ['injection-exploit', 'xss-exploit', 'auth-exploit', 'ssrf-exploit', 'authz-exploit'],
     promptTemplate: 'report-executive',
     deliverableFilename: 'comprehensive_security_assessment_report.md',
+    // Report ingests every prior deliverable at once; needs the large-tier's big
+    // context window (glm-5: 1M) to avoid model_context_window_exceeded.
+    modelTier: 'large',
   },
 });
 
