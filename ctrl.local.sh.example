@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# ctrl.local.sh — personal scan targets, sourced by ctrl.sh if present.
+# Copy to ctrl.local.sh and add your own targets. ctrl.local.sh is gitignored.
+#
+# Available from ctrl.sh: shannon(), dctl(), and $DATA_ROOT / $CFG.
+# Set a local DATA_ROOT in each target to use its absolute host path.
+# This also overrides dctl's mount and .shannon-ctrl-home cache location for that call.
+
+# Example: assemble a combined source tree for whitebox coverage.
+# More source = better whitebox. Point one -r path at a dir with all relevant source.
+sources_example() {
+  local DATA_ROOT="/absolute/path/to/example-src"
+  dctl bash -lc '
+    set -e; root="'"${DATA_ROOT}"'"
+    mkdir -p "$root"; cd "$root"
+    [ -d SomeRepo ] || git clone --depth 1 https://github.com/org/SomeRepo.git
+    echo "example-src:"; ls'
+}
+
+# Example: run a scan. Create apps/worker/configs/example.yaml from an existing config.
+scan_example() {
+  local DATA_ROOT="/absolute/path/to/example-src"
+  shannon start -u https://example.com/ \
+    -r "${DATA_ROOT}" -c "${CFG}/example.yaml" -w example
+}
+
+# Example: reset parked activities after a usage-quota window refreshes.
+resume_after_usage_reset() {
+  local ws="$1" tctl=(docker exec shannon-temporal temporal --address localhost:7233)
+  local wfid=$("${tctl[@]}" workflow list --query "WorkflowId STARTS_WITH '${ws}_' AND ExecutionStatus='Running'" -o json | grep -oE '"workflowId": *"[^"]+"' | cut -d'"' -f4 | sort -u)
+  [ -n "$wfid" ] || { echo "No running workflow for '$ws'." >&2; return 1; }
+  echo "Resetting parked activities for $wfid"
+
+  "${tctl[@]}" workflow describe --workflow-id "$wfid" -o json | grep -oE '"activityId": *"[^"]+"' | cut -d'"' -f4 | sort -u | while read -r aid; do
+    printf '  activity %s ... ' "$aid"
+    "${tctl[@]}" activity reset --workflow-id "$wfid" --activity-id "$aid" >/dev/null 2>&1 && echo ok || echo FAILED
+  done
+}
+
