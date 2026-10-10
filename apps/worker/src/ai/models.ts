@@ -258,13 +258,62 @@ export interface ModelSelection {
   readonly credentialSource: 'api-key' | 'pi-auth' | 'ambient';
 }
 
+interface BundledModelOverride {
+  readonly name: string;
+  readonly contextWindow: number;
+  readonly maxTokens: number;
+  readonly referenceModelId: string;
+}
+
+/**
+ * Codex subscription models released after the pi version pinned by Shannon.
+ *
+ * These aliases use pi's existing openai-codex transport and OAuth flow; only
+ * their catalogue metadata is missing. Access remains enforced by ChatGPT, and
+ * the preflight probe fails normally when the signed-in account is not entitled
+ * to the requested model or access program.
+ */
+const OPENAI_CODEX_MODEL_OVERRIDES: Readonly<Record<string, BundledModelOverride>> = {
+  'gpt-daybreak-blue-latest': {
+    name: 'Daybreak Blue',
+    contextWindow: 272_000,
+    maxTokens: 128_000,
+    // Daybreak Blue currently uses the same pricing and request shape as Sol.
+    referenceModelId: 'gpt-5.6-sol',
+  },
+};
+
+function resolveBundledModelOverride(
+  modelRuntime: ModelRuntime,
+  providerId: string,
+  modelId: string,
+): Model<Api> | undefined {
+  if (providerId !== 'openai-codex') return undefined;
+
+  const override = OPENAI_CODEX_MODEL_OVERRIDES[modelId];
+  if (!override) return undefined;
+
+  const reference =
+    modelRuntime.getModel(providerId, override.referenceModelId) ?? modelRuntime.getModels(providerId)[0];
+  if (!reference) return undefined;
+
+  return {
+    ...reference,
+    id: modelId,
+    name: override.name,
+    contextWindow: override.contextWindow,
+    maxTokens: override.maxTokens,
+  };
+}
+
 /**
  * Resolve a model against a runtime, returning undefined when the id is unknown.
  *
- * The model must exist in the runtime's registry, whether or not an endpoint override
- * is in play — a base URL changes the address and nothing else. A gateway serving a
- * model under its own name is described in a `--models-config` file, which puts a real
- * descriptor in the registry rather than guessing one from an unrelated model.
+ * The model must exist in the runtime's registry or the bundled Codex overrides,
+ * whether or not an endpoint override is in play — a base URL changes the address
+ * and nothing else. A gateway serving a model under its own name is described in a
+ * `--models-config` file, which puts a real descriptor in the registry rather than
+ * guessing one from an unrelated model.
  */
 export function resolveModel(
   modelRuntime: ModelRuntime,
@@ -272,7 +321,8 @@ export function resolveModel(
   modelId: string,
   baseUrl: string | undefined,
 ): Model<Api> | undefined {
-  const found = modelRuntime.getModel(providerId, modelId);
+  const found =
+    modelRuntime.getModel(providerId, modelId) ?? resolveBundledModelOverride(modelRuntime, providerId, modelId);
   if (!found) return undefined;
 
   return baseUrl ? { ...found, baseUrl } : found;
