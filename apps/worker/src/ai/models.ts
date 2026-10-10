@@ -238,6 +238,54 @@ export interface ModelSelection {
   providerId: string;
 }
 
+interface BundledModelOverride {
+  readonly name: string;
+  readonly contextWindow: number;
+  readonly maxTokens: number;
+  readonly referenceModelId: string;
+}
+
+/**
+ * Codex subscription models released after the pi version pinned by Shannon.
+ *
+ * These aliases use pi's existing openai-codex transport and OAuth flow; only
+ * their catalogue metadata is missing. Access remains enforced by ChatGPT, and
+ * the preflight probe fails normally when the signed-in account is not entitled
+ * to the requested model or access program.
+ */
+const OPENAI_CODEX_MODEL_OVERRIDES: Readonly<Record<string, BundledModelOverride>> = {
+  'gpt-daybreak-blue-latest': {
+    name: 'Daybreak Blue',
+    contextWindow: 272_000,
+    maxTokens: 128_000,
+    // Daybreak Blue currently uses the same pricing and request shape as Sol.
+    referenceModelId: 'gpt-5.6-sol',
+  },
+};
+
+function resolveBundledModelOverride(
+  modelRuntime: ModelRuntime,
+  providerId: string,
+  modelId: string,
+): Model<Api> | undefined {
+  if (providerId !== 'openai-codex') return undefined;
+
+  const override = OPENAI_CODEX_MODEL_OVERRIDES[modelId];
+  if (!override) return undefined;
+
+  const reference =
+    modelRuntime.getModel(providerId, override.referenceModelId) ?? modelRuntime.getModels(providerId)[0];
+  if (!reference) return undefined;
+
+  return {
+    ...reference,
+    id: modelId,
+    name: override.name,
+    contextWindow: override.contextWindow,
+    maxTokens: override.maxTokens,
+  };
+}
+
 /**
  * Point a model descriptor at a gateway.
  *
@@ -281,6 +329,12 @@ export function resolveModel(
   if (found) {
     return baseUrl ? pointAtGateway(found, providerId, baseUrl, format) : found;
   }
+
+  const bundledOverride = resolveBundledModelOverride(modelRuntime, providerId, modelId);
+  if (bundledOverride) {
+    return baseUrl ? pointAtGateway(bundledOverride, providerId, baseUrl, format) : bundledOverride;
+  }
+
   if (!baseUrl) return undefined;
 
   const reference = modelRuntime.getModels(providerId)[0];
