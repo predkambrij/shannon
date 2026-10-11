@@ -114,7 +114,8 @@ const TESTING_RETRY = {
 };
 
 const acts = proxyActivities<typeof activities>({
-  startToCloseTimeout: '2 hours',
+  // Allow subscription limits to reset, including the weekly ChatGPT window.
+  startToCloseTimeout: '8 days',
   heartbeatTimeout: '60 minutes',
   retry: PRODUCTION_RETRY,
   cancellationType: ActivityCancellationType.TRY_CANCEL,
@@ -135,15 +136,17 @@ const SHORT_RETRY = {
   nonRetryableErrorTypes: PRODUCTION_RETRY.nonRetryableErrorTypes,
 };
 
+// Credential probes may wait for a subscription usage window to reset.
 const preflightActs = proxyActivities<typeof activities>({
-  startToCloseTimeout: '2 minutes',
+  startToCloseTimeout: '8 days',
   heartbeatTimeout: '2 minutes',
   retry: SHORT_RETRY,
   cancellationType: ActivityCancellationType.TRY_CANCEL,
 });
 
+// Browser-driving validation may also wait for a subscription usage reset.
 const authValidationActs = proxyActivities<typeof activities>({
-  startToCloseTimeout: '10 minutes',
+  startToCloseTimeout: '8 days',
   heartbeatTimeout: '10 minutes',
   retry: SHORT_RETRY,
   cancellationType: ActivityCancellationType.TRY_CANCEL,

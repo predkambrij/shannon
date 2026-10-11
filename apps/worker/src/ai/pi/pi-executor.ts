@@ -51,6 +51,7 @@ import { createTaskTool } from './task-tool.js';
 import { PI_THINKING_LEVEL } from './thinking-level.js';
 import { TraceEmitter } from './trace-emitter.js';
 import { providerTurnError, type SafeProviderTurnDetails, safeProviderTurnDetails } from './turn-error.js';
+import { withUsageLimitRetries } from './usage-limit-retry.js';
 
 declare global {
   var SHANNON_DISABLE_LOADER: boolean | undefined;
@@ -344,6 +345,8 @@ export async function runPiPrompt(
       settingsManager: SettingsManager.inMemory({ retry: PI_RETRY_SETTINGS, compaction: { enabled: true } }),
       resourceLoader,
     }));
+
+    session.agent.streamFunction = withUsageLimitRetries(session.agent.streamFunction);
 
     // Wire activity cancellation to the session now that it exists.
     if (cancellationSignal?.aborted) {

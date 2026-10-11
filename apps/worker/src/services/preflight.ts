@@ -49,6 +49,7 @@ import {
 } from '../ai/models.js';
 import { PI_RETRY_SETTINGS } from '../ai/pi/retry-settings.js';
 import { providerTurnError } from '../ai/pi/turn-error.js';
+import { withUsageLimitRetries } from '../ai/pi/usage-limit-retry.js';
 import { parseConfig } from '../config-parser.js';
 import type { ActivityLogger } from '../types/activity-logger.js';
 import type { Config, Rule } from '../types/config.js';
@@ -245,6 +246,7 @@ async function probeCredentialsWithPi(
   model: Model<Api>,
   modelRuntime: ModelRuntime,
   authType: string,
+  cancellationSignal?: AbortSignal,
 ): Promise<Result<void, PentestError>> {
   let failedTurn: AssistantMessage | undefined;
   let session: AgentSession | undefined;
@@ -257,6 +259,8 @@ async function probeCredentialsWithPi(
       sessionManager: SessionManager.inMemory(),
       settingsManager: SettingsManager.inMemory({ retry: PI_RETRY_SETTINGS, compaction: { enabled: false } }),
     }));
+    session.agent.streamFunction = withUsageLimitRetries(session.agent.streamFunction, cancellationSignal);
+
     session.subscribe((e) => {
       if (e.type === 'turn_end' && e.message.role === 'assistant' && e.message.stopReason === 'error') {
         failedTurn = e.message;
@@ -305,7 +309,10 @@ function describeAuth(providerId: string, baseUrl: string | undefined): string {
 }
 
 /** Validate the model selection and its credentials via a minimal pi session. */
-async function validateCredentials(logger: ActivityLogger): Promise<Result<void, PentestError>> {
+async function validateCredentials(
+  logger: ActivityLogger,
+  cancellationSignal?: AbortSignal,
+): Promise<Result<void, PentestError>> {
   // 1. Resolve the run's model. A malformed spec or unknown provider fails here,
   //    before any scan work begins.
   let spec: ModelSpec;
@@ -392,7 +399,7 @@ async function validateCredentials(logger: ActivityLogger): Promise<Result<void,
   //    so the probe exercises the same auth path the scan will.
   const authType = describeAuth(spec.providerId, credentials.baseUrl);
   logger.info(`Validating ${authType} via pi...`);
-  const probe = await probeCredentialsWithPi(baseModel, modelRuntime, authType);
+  const probe = await probeCredentialsWithPi(baseModel, modelRuntime, authType, cancellationSignal);
   if (isErr(probe)) return probe;
   logger.info(`${authType} OK`);
   return ok(undefined);
@@ -536,6 +543,7 @@ export async function runPreflightChecks(
   repoPath: string,
   configPath: string | undefined,
   logger: ActivityLogger,
+  cancellationSignal?: AbortSignal,
 ): Promise<Result<void, PentestError>> {
   // 1. Repository check (free — filesystem only)
   const repoResult = await validateRepo(repoPath, logger);
@@ -563,7 +571,7 @@ export async function runPreflightChecks(
   }
 
   // 4. Credential check (cheap — 1 pi round-trip)
-  const credResult = await validateCredentials(logger);
+  const credResult = await validateCredentials(logger, cancellationSignal);
   if (!credResult.ok) {
     return credResult;
   }

@@ -21,6 +21,7 @@ import { type LoggableAgentName, normalizeSemanticLabel } from '../../audit/safe
 import { PI_RETRY_SETTINGS } from './retry-settings.js';
 import { PI_THINKING_LEVEL } from './thinking-level.js';
 import { TraceEmitter } from './trace-emitter.js';
+import { withUsageLimitRetries } from './usage-limit-retry.js';
 
 export interface TaskToolContext {
   readonly cwd: string;
@@ -145,6 +146,8 @@ export function createTaskTool(config: TaskToolContext): ToolDefinition {
             compaction: { enabled: true },
           }),
         }));
+
+        subSession.agent.streamFunction = withUsageLimitRetries(subSession.agent.streamFunction);
 
         if (config.cancellationSignal?.aborted) {
           abortChildSession();
