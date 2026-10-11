@@ -93,7 +93,8 @@ const TESTING_RETRY = {
 
 // Activity proxy with production retry configuration (default)
 const acts = proxyActivities<typeof activities>({
-  startToCloseTimeout: '2 hours',
+  // Allow subscription limits to reset, including the weekly ChatGPT window.
+  startToCloseTimeout: '8 days',
   heartbeatTimeout: '60 minutes', // Extended for nested pi task execution
   retry: PRODUCTION_RETRY,
   // Cancel promptly instead of waiting out startToCloseTimeout; the agent aborts on the signal.
@@ -117,9 +118,9 @@ const PREFLIGHT_RETRY = {
   nonRetryableErrorTypes: PRODUCTION_RETRY.nonRetryableErrorTypes,
 };
 
-// Activity proxy for preflight validation (short timeout)
+// Credential probes may wait for a subscription usage window to reset.
 const preflightActs = proxyActivities<typeof activities>({
-  startToCloseTimeout: '2 minutes',
+  startToCloseTimeout: '8 days',
   heartbeatTimeout: '2 minutes',
   retry: PREFLIGHT_RETRY,
   cancellationType: ActivityCancellationType.TRY_CANCEL,
@@ -134,9 +135,9 @@ const AUTH_VALIDATION_RETRY = {
   nonRetryableErrorTypes: PRODUCTION_RETRY.nonRetryableErrorTypes,
 };
 
-// Browser-driving validation measured at 60–180s; 10 min start-to-close leaves headroom for slow SSO/MFA flows.
+// Browser-driving validation may also wait for a subscription usage reset.
 const authValidationActs = proxyActivities<typeof activities>({
-  startToCloseTimeout: '10 minutes',
+  startToCloseTimeout: '8 days',
   heartbeatTimeout: '10 minutes',
   retry: AUTH_VALIDATION_RETRY,
   cancellationType: ActivityCancellationType.TRY_CANCEL,

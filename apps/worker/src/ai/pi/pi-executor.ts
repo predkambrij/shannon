@@ -45,6 +45,7 @@ import { PI_RETRY_SETTINGS } from './retry-settings.js';
 import { createGlobTool, createTodoWriteTool } from './session-tools.js';
 import { createTaskTool } from './task-tool.js';
 import { providerTurnError } from './turn-error.js';
+import { withUsageLimitRetries } from './usage-limit-retry.js';
 
 declare global {
   var SHANNON_DISABLE_LOADER: boolean | undefined;
@@ -314,6 +315,8 @@ export async function runPiPrompt(
       settingsManager: SettingsManager.inMemory({ retry: PI_RETRY_SETTINGS, compaction: { enabled: true } }),
       resourceLoader,
     }));
+
+    session.agent.streamFunction = withUsageLimitRetries(session.agent.streamFunction);
 
     // Wire activity cancellation to the session now that it exists.
     if (cancellationSignal?.aborted) {

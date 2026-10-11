@@ -28,6 +28,7 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 import { PI_RETRY_SETTINGS } from './retry-settings.js';
+import { withUsageLimitRetries } from './usage-limit-retry.js';
 
 export interface TaskToolContext {
   cwd: string;
@@ -94,6 +95,8 @@ export function createTaskTool(config: TaskToolContext): ToolDefinition {
           compaction: { enabled: true },
         }),
       });
+
+      subSession.agent.streamFunction = withUsageLimitRetries(subSession.agent.streamFunction);
 
       const abortChildSession = (): void => {
         void subSession.abort().catch(() => {
