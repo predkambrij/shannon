@@ -24,6 +24,11 @@ scan_example() {
   shannon start -u https://example.com/ \
     -r "${DATA_ROOT}" -c "${CFG}/example.yaml" -w example
 }
+scan_test() {
+  local DATA_ROOT="/absolute/path/to/shannon_empty"
+  shannon start -u https://example.com/ \
+    -r "${DATA_ROOT}" -c "${CFG}/example-test.yaml" -w example_test
+}
 
 # Example: reset parked activities after a usage-quota window refreshes.
 resume_after_usage_reset() {
