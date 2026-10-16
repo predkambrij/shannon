@@ -325,6 +325,30 @@ export function resolveModel(
     modelRuntime.getModel(providerId, modelId) ?? resolveBundledModelOverride(modelRuntime, providerId, modelId);
   if (!found) return undefined;
 
+  // z.ai rejects "medium" (pi's default) and requires low, high, or max.
+  if (
+    baseUrl &&
+    providerId === 'anthropic' &&
+    modelId === 'glm-5.3-flash' &&
+    new URL(baseUrl).hostname === 'api.z.ai'
+  ) {
+    return {
+      ...found,
+      baseUrl,
+      reasoning: true,
+      thinkingLevelMap: {
+        off: null,
+        minimal: 'low',
+        low: 'low',
+        medium: 'high',
+        high: 'high',
+        xhigh: 'max',
+        max: 'max',
+      },
+      compat: { ...found.compat, forceAdaptiveThinking: true },
+    };
+  }
+
   return baseUrl ? { ...found, baseUrl } : found;
 }
 
