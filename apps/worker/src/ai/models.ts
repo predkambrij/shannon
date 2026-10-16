@@ -299,6 +299,25 @@ function resolveBundledModelOverride(
  * changes address.
  */
 function pointAtGateway(model: Model<Api>, providerId: string, baseUrl: string, format: OpenAiFormat): Model<Api> {
+  // This unlisted model otherwise inherits Claude's thinking levels. z.ai rejects
+  // "medium" (pi's default) and requires low, high, or max for every request.
+  if (providerId === 'anthropic' && model.id === 'glm-5.3-flash' && new URL(baseUrl).hostname === 'api.z.ai') {
+    return {
+      ...model,
+      baseUrl,
+      reasoning: true,
+      thinkingLevelMap: {
+        off: null,
+        minimal: 'low',
+        low: 'low',
+        medium: 'high',
+        high: 'high',
+        xhigh: 'max',
+        max: 'max',
+      },
+      compat: { ...model.compat, forceAdaptiveThinking: true },
+    };
+  }
   if (providerId !== 'openai') return { ...model, baseUrl };
   if (format === 'responses') return { ...model, baseUrl, api: OPENAI_FORMATS.responses };
 
