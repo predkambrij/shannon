@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Runtime directories
+.shannon-ctrl-home/
 sessions/
 deliverables/
 xben-benchmark-results/

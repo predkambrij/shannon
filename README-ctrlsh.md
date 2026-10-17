@@ -6,10 +6,12 @@ only Docker — Node, pnpm, git, and all compilation happen inside a toolchain i
 as well as z.ai's GLM models through the Anthropic-compatible endpoint.
 
 - **Commands run any function directly:** `./ctrl.sh <function> [args]`.
-- **`DATA_ROOT`** (set in `.env-ctrlsh`) is the default host mount and toolchain/login
-  cache location. Target functions can override it with their own absolute path.
+- **`DATA_ROOT`** is set locally in each target function in `ctrl.local.sh` to mount
+  its source directory. Build, login, and management commands need no `DATA_ROOT`.
+  Toolchain cache and Pi login are shared across targets in the Shannon repo’s
+  `.shannon-ctrl-home/` directory.
 - **Config & secrets** live in `.env-ctrlsh` (gitignored) — copy `.env-ctrlsh.example`,
-  set `DATA_ROOT`, and select either the ChatGPT subscription or z.ai block.
+  and select either the ChatGPT subscription or z.ai block.
 - **Personal scan targets** live in `ctrl.local.sh` (gitignored) — copy
   `ctrl.local.sh.example` and add your own `scan_*`/`sources_*` functions. `ctrl.sh`
   sources it automatically if present.
@@ -24,7 +26,7 @@ Docker installed and running. That's it.
 ### 2. Config (one-time)
 ```bash
 cp .env-ctrlsh.example .env-ctrlsh
-# then edit .env-ctrlsh: set DATA_ROOT and choose one provider block
+# then edit .env-ctrlsh: choose one provider block
 cp ctrl.local.sh.example ctrl.local.sh   # optional: add your scan targets
 ```
 
@@ -46,8 +48,17 @@ With the ChatGPT block enabled in `.env-ctrlsh`, start Pi's login UI:
 
 Enter `/login`, select **ChatGPT Plus/Pro (Codex)**, and complete the browser or
 device-code flow. The OAuth credential is stored at
-`DATA_ROOT/.shannon-ctrl-home/.pi/agent/auth.json`, where it survives toolchain
-containers and can be refreshed by scan workers. Treat that file like a password.
+`<shannon-repo>/.shannon-ctrl-home/.pi/agent/auth.json`, where it survives toolchain
+containers and can be refreshed by scan workers. All targets reuse this login.
+The directory is excluded from Git and Docker build contexts. Treat that file like a password.
+
+To reuse an existing login from the old location, run this from the Shannon repo
+(replace `/old/data-root` with the `DATA_ROOT` used for that login):
+
+```bash
+mkdir -p .shannon-ctrl-home/.pi/agent
+cp -n /old/data-root/.shannon-ctrl-home/.pi/agent/auth.json .shannon-ctrl-home/.pi/agent/
+```
 
 This uses `SHANNON_USE_PI_AUTH=1` with an `openai-codex:` model; it does not use or
 bill an OpenAI API key. OpenAI documents the distinction between subscription and
@@ -100,9 +111,9 @@ scan_mytarget() {
 }
 ```
 
-Keep the default `DATA_ROOT` in `.env-ctrlsh` for build and login commands. A local
-override also changes the `.shannon-ctrl-home` cache location used during that scan;
-subscription scans need Pi credentials available in that location.
+Each target’s local `DATA_ROOT` controls its data mount. No global `DATA_ROOT` is
+required in `.env-ctrlsh`. The toolchain cache and Pi credentials stay in the
+Shannon repo’s `.shannon-ctrl-home/`, so each target reuses the same login.
 
 Then run `./ctrl.sh scan_mytarget`. Create `apps/worker/configs/my-target.yaml` by copying an
 existing one and editing the login / `success_condition` / rules. For an **unauthenticated**

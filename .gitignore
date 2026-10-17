@@ -8,3 +8,4 @@ credentials/
 dist/
 repos/
 .turbo/
+.shannon-ctrl-home/

@@ -16,7 +16,6 @@ if [ ! -f .env-ctrlsh ]; then
   exit 1
 fi
 set -a; . ./.env-ctrlsh; set +a
-: "${DATA_ROOT:?set DATA_ROOT in .env-ctrlsh}"
 : "${SHANNON_AI_MODEL:?set SHANNON_AI_MODEL in .env-ctrlsh}"
 : "${DOCKER_SOCKET_PATH:?set DOCKER_SOCKET_PATH in .env-ctrlsh}"
 
@@ -42,6 +41,7 @@ unset pi_auth_value
 # ── Layout ───────────────────────────────────────────────────────────────────
 CTRL_IMAGE="shannon-ctrl"   # toolchain image (Dockerfile.ctrl)
 CFG="apps/worker/configs"   # per-target scan configs
+CTRL_HOME="${PWD}/.shannon-ctrl-home" # shared toolchain cache and login across targets
 
 # ── Docker plumbing ──────────────────────────────────────────────────────────
 # Run a command in the toolchain container: host docker socket + data root mounted at
@@ -51,15 +51,19 @@ CFG="apps/worker/configs"   # per-target scan configs
 # pass as env (the Shannon CLI reads them directly — no repository .env needed).
 dctl() {
   local tty=(); [ -t 1 ] && tty=(-t)
-  mkdir -p "${DATA_ROOT}/.shannon-ctrl-home"
+  local data_mount=()
+  if [ -n "${DATA_ROOT:-}" ]; then
+    data_mount=(-v "${DATA_ROOT}:${DATA_ROOT}")
+  fi
+  mkdir -p "${CTRL_HOME}"
   docker run --rm -i "${tty[@]}" \
     --user "$(id -u):$(id -g)" \
     --group-add "$(getent group docker | cut -d: -f3)" \
     -v "${DOCKER_SOCKET_PATH}:/var/run/docker.sock" \
-    -v "${DATA_ROOT}:${DATA_ROOT}" \
+    "${data_mount[@]}" \
     -v "${PWD}:${PWD}" \
     -w "${PWD}" \
-    -e "HOME=${DATA_ROOT}/.shannon-ctrl-home" \
+    -e "HOME=${CTRL_HOME}" \
     -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     -e SHANNON_AI_BASE_URL \
     -e SHANNON_AI_API_KEY \
@@ -90,7 +94,7 @@ chatgpt_login() {
   printf '%s\n' \
     "In Pi, enter /login and choose ChatGPT Plus/Pro (Codex)." \
     "Complete the browser or device-code flow, then press Ctrl-D to return." \
-    "Credentials persist in ${DATA_ROOT}/.shannon-ctrl-home/.pi/agent/auth.json." \
+    "Credentials persist in ${CTRL_HOME}/.pi/agent/auth.json." \
     ""
   dctl "${pi_bin}" --no-approve --no-session
 }
@@ -102,7 +106,7 @@ function git_diff_local() {
 
 # ── Personal scan targets (gitignored, optional) ──────────────────────────────
 # Define your scan_*/sources_* helpers in ctrl.local.sh — see ctrl.local.sh.example.
-# ctrl.sh exposes shannon(), dctl(), and $DATA_ROOT / $CFG for them to use.
+# ctrl.sh exposes shannon(), dctl(), and $CFG; targets can set local DATA_ROOT.
 [ -f ctrl.local.sh ] && . ./ctrl.local.sh
 
 # Dispatch: run the named function directly. Examples:
