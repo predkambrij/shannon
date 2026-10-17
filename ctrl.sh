@@ -95,6 +95,11 @@ chatgpt_login() {
   dctl "${pi_bin}" --no-approve --no-session
 }
 
+function git_diff_local() {
+    git diff -w --no-index ctrl.local.sh.example ctrl.local.sh || true
+    git diff -w --no-index .env-ctrlsh.example .env-ctrlsh || true
+}
+
 # ── Personal scan targets (gitignored, optional) ──────────────────────────────
 # Define your scan_*/sources_* helpers in ctrl.local.sh — see ctrl.local.sh.example.
 # ctrl.sh exposes shannon(), dctl(), and $DATA_ROOT / $CFG for them to use.
