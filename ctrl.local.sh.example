@@ -3,9 +3,9 @@
 # ctrl.local.sh — personal scan targets, sourced by ctrl.sh if present.
 # Copy to ctrl.local.sh and add your own targets. ctrl.local.sh is gitignored.
 #
-# Available from ctrl.sh: shannon(), dctl(), and $DATA_ROOT / $CFG.
+# Available from ctrl.sh: shannon(), dctl(), and $CFG.
 # Set a local DATA_ROOT in each target to use its absolute host path.
-# This also overrides dctl's mount and .shannon-ctrl-home cache location for that call.
+# This overrides dctl's data mount; cache and login stay shared in the Shannon repo.
 
 # Example: assemble a combined source tree for whitebox coverage.
 # More source = better whitebox. Point one -r path at a dir with all relevant source.
